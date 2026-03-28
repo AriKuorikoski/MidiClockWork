@@ -29,6 +29,8 @@ from midi_clock_tracker import MidiClockTracker
 
 def make_tracker():
     mock_time._us = 0
+    time.ticks_us = mock_time.ticks_us
+    time.ticks_diff = mock_time.ticks_diff
     bus = EventBus()
     tracker = MidiClockTracker(bus)
     return bus, tracker

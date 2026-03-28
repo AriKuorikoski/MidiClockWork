@@ -6,3 +6,27 @@ rfc2217ServerPort = 4000
 
 [[fs]]
 path = "src/main.py"
+
+[[fs]]
+path = "src/event_bus.py"
+
+[[fs]]
+path = "src/midi_message.py"
+
+[[fs]]
+path = "src/midi_input.py"
+
+[[fs]]
+path = "src/midi_output.py"
+
+[[fs]]
+path = "src/midi_clock_tracker.py"
+
+[[fs]]
+path = "src/midi_router.py"
+
+[[fs]]
+path = "src/uart_writer.py"
+
+[[fs]]
+path = "src/tempo_to_cc.py"

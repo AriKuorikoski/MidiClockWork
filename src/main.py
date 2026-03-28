@@ -1,10 +1,12 @@
 from machine import Pin, UART
 import time
 from event_bus import EventBus
-
 from midi_clock_tracker import MidiClockTracker
 from midi_input import MidiInput
 from midi_output import MidiOutput
+from midi_router import MidiRouter
+from tempo_to_cc import ValetonTempoHandler
+from uart_writer import MessageFilter, UartWriter
 
 # Hardware
 tempo_led = Pin(15, Pin.OUT)
@@ -13,34 +15,24 @@ button = Pin(14, Pin.IN, Pin.PULL_UP)
 
 # MIDI hardware
 midi_uart_in = UART(0, baudrate=31250, rx=Pin(1))
-
-# Dummy UART for testing output
-class DummyUart:
-    def write(self, data):
-        print("OUT: {}".format([hex(b) for b in data]))
+midi_uart_out1 = UART(1, baudrate=31250, tx=Pin(4))
 
 # Event system
 bus = EventBus()
 
-# MIDI input and output
+# Components
 midi_in = MidiInput("IN", midi_uart_in, bus)
-midi_out = MidiOutput("OUT1", DummyUart(), bus)
-
-# Clock tracker listens to incoming MIDI
 clock = MidiClockTracker(bus)
+router = MidiRouter(bus, clock)
 
-# Wire midi_in events to clock tracker and outputs
-def on_midi_in(msg):
-    clock.process(msg)
-    bus.emit("midi_out", msg)
-
-bus.on("midi_in", on_midi_in)
+# OUT1: pass everything through
+midi_out = MidiOutput("OUT1", 
+                      bus, 
+                      UartWriter(midi_uart_out1, MessageFilter()),
+                      ValetonTempoHandler(0))
 
 # Tempo LED blinks on beat
-def on_beat():
-    tempo_led.toggle()
-
-bus.on("beat", on_beat)
+bus.on("beat", lambda: tempo_led.toggle())
 
 print("MidiClockWork starting...")
 

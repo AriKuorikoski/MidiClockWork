@@ -35,6 +35,7 @@ python -m pytest tests/ -v
 
 ## Documentation
 
+- [Architecture & message flow](docs/architecture.md)
 - [Development setup](docs/setup.md)
 - [Circuit schematic](docs/schematic.md)
 - [Bill of materials](docs/bom.md)

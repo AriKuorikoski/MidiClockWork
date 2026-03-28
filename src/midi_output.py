@@ -1,23 +1,17 @@
 class MidiOutput:
-    def __init__(self, name, uart, bus):
+    def __init__(self, name, bus, writer, tempo_handler=None):
         self.name = name
-        self.uart = uart
         self.bus = bus
-        self._filters = []
+        self._writer = writer
+        self._tempo_handler = tempo_handler
 
         bus.on("midi_out", self._on_message)
-
-    def add_filter(self, filter_fn):
-        self._filters.append(filter_fn)
-
-    def remove_filter(self, filter_fn):
-        self._filters.remove(filter_fn)
+        bus.on("tempo_changed", self._on_tempo_changed)
 
     def _on_message(self, msg):
-        for f in self._filters:
-            if not f(msg):
-                return
-        self._write_data(msg)
+        if self._writer.filter.matches(msg):
+            self._writer.process(msg)
 
-    def _write_data(self, msg):
-        self.uart.write(msg.serialize())
+    def _on_tempo_changed(self, bpm):
+        if self._tempo_handler is not None:
+            self._tempo_handler.handle(bpm, self._writer)
