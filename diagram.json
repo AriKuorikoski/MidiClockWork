@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "author": "MidiClockWork",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-pi-pico",
+      "id": "pico",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led",
+      "id": "tempo_led",
+      "top": -50,
+      "left": 150,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_tempo",
+      "top": -30,
+      "left": 100,
+      "attrs": { "value": "330" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "wireless_led",
+      "top": -50,
+      "left": 250,
+      "attrs": { "color": "blue" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_wireless",
+      "top": -30,
+      "left": 200,
+      "attrs": { "value": "330" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_wireless",
+      "top": -50,
+      "left": 350,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    ["pico:GP15", "r_tempo:1", "green", []],
+    ["r_tempo:2", "tempo_led:A", "green", []],
+    ["tempo_led:C", "pico:GND.1", "black", []],
+
+    ["pico:GP16", "r_wireless:1", "blue", []],
+    ["r_wireless:2", "wireless_led:A", "blue", []],
+    ["wireless_led:C", "pico:GND.2", "black", []],
+
+    ["pico:GP14", "btn_wireless:1.l", "orange", []],
+    ["btn_wireless:2.l", "pico:GND.3", "black", []]
+  ]
+}

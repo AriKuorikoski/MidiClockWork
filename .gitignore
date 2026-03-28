@@ -1,0 +1,27 @@
+# CircuitPython
+# Don't commit the full CircuitPython library bundle
+lib/
+
+# Firmware binaries
+*.uf2
+
+# Build artifacts
+*.mpy
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+
+# Claude Code local config
+.claude/
+
+# Secrets
+settings.toml
+secrets.py
