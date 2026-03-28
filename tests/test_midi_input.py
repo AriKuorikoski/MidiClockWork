@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from event_bus import EventBus
 from midi_message import NOTE_ON, NOTE_OFF, CC, PC, CLOCK, START, STOP

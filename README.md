@@ -26,6 +26,15 @@ The original use case: translate MIDI clock from a Boss MS-3 into tempo CC comma
 - **Debug:** Serial console (REPL)
 - **Emulator:** Wokwi (for development without hardware)
 
-## Setup
+## Quick start
 
-See [docs/setup.md](docs/setup.md) for development environment setup.
+```
+python -m pip install pytest
+python -m pytest tests/ -v
+```
+
+## Documentation
+
+- [Development setup](docs/setup.md)
+- [Circuit schematic](docs/schematic.md)
+- [Bill of materials](docs/bom.md)
