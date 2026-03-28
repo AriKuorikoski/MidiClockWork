@@ -30,3 +30,12 @@ path = "src/uart_writer.py"
 
 [[fs]]
 path = "src/tempo_to_cc.py"
+
+[[fs]]
+path = "src/config.py"
+
+[[fs]]
+path = "src/system_builder.py"
+
+[[fs]]
+path = "src/config.json"

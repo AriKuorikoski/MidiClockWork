@@ -36,6 +36,8 @@ def make_router():
     return bus, clock, router
 
 
+
+
 def test_forwards_midi_in_to_midi_out():
     bus, clock, router = make_router()
     received = []

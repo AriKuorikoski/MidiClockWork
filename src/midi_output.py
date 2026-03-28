@@ -13,5 +13,8 @@ class MidiOutput:
             self._writer.process(msg)
 
     def _on_tempo_changed(self, bpm):
-        if self._tempo_handler is not None:
-            self._tempo_handler.handle(bpm, self._writer)
+        if self._tempo_handler is None:
+            return
+        for msg in self._tempo_handler.handle(bpm):
+            if self._writer.filter.matches(msg):
+                self._writer.process(msg)

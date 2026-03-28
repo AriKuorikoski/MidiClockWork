@@ -63,75 +63,62 @@ def test_bpm_midrange():
 
 # --- TempoHandler (base / null object) ---
 
-class MockWriter:
-    def __init__(self):
-        self.processed = []
-
-    def process(self, msg):
-        self.processed.append(msg)
-
-
 def test_base_handler_does_nothing():
-    writer = MockWriter()
-    handler = TempoHandler()
-    handler.handle(120.0, writer)
-    assert writer.processed == []
+    assert TempoHandler().handle(120.0) == []
 
 
 # --- ValetonTempoHandler ---
 
+def test_valeton_default_channel():
+    handler = ValetonTempoHandler()
+    assert handler.channels == [0]
+
 def test_valeton_ignores_bpm_out_of_range():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=0)
-    handler.handle(30.0, writer)   # below min
-    handler.handle(300.0, writer)  # above max
-    assert writer.processed == []
+    handler = ValetonTempoHandler()
+    assert handler.handle(30.0) == []
+    assert handler.handle(300.0) == []
 
-
-def test_valeton_calls_process_twice():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=0)
-    handler.handle(120.0, writer)
-    assert len(writer.processed) == 2
+def test_valeton_single_channel_two_messages():
+    msgs = ValetonTempoHandler(channels=[0]).handle(120.0)
+    assert len(msgs) == 2
 
 def test_valeton_cc_numbers():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=0)
-    handler.handle(120.0, writer)
-    assert writer.processed[0].data1 == 73
-    assert writer.processed[1].data1 == 74
+    msgs = ValetonTempoHandler(channels=[0]).handle(120.0)
+    assert msgs[0].data1 == 73
+    assert msgs[1].data1 == 74
 
 def test_valeton_message_type_is_cc():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=0)
-    handler.handle(120.0, writer)
-    assert writer.processed[0].type == CC
-    assert writer.processed[1].type == CC
+    msgs = ValetonTempoHandler(channels=[0]).handle(120.0)
+    assert msgs[0].type == CC
+    assert msgs[1].type == CC
 
 def test_valeton_120_bpm_values():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=0)
-    handler.handle(120.0, writer)
-    assert writer.processed[0].data2 == 0    # CC73 = 0 (range 0)
-    assert writer.processed[1].data2 == 120  # CC74 = 120
+    msgs = ValetonTempoHandler(channels=[0]).handle(120.0)
+    assert msgs[0].data2 == 0
+    assert msgs[1].data2 == 120
 
 def test_valeton_200_bpm_values():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=0)
-    handler.handle(200.0, writer)
-    assert writer.processed[0].data2 == 1   # CC73 = 1 (range 1)
-    assert writer.processed[1].data2 == 72  # CC74 = 200 - 128
+    msgs = ValetonTempoHandler(channels=[0]).handle(200.0)
+    assert msgs[0].data2 == 1
+    assert msgs[1].data2 == 72
 
 def test_valeton_260_bpm_values():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=0)
-    handler.handle(260.0, writer)
-    assert writer.processed[0].data2 == 2  # CC73 = 2 (range 2)
-    assert writer.processed[1].data2 == 4  # CC74 = 260 - 256
+    msgs = ValetonTempoHandler(channels=[0]).handle(260.0)
+    assert msgs[0].data2 == 2
+    assert msgs[1].data2 == 4
 
 def test_valeton_uses_configured_channel():
-    writer = MockWriter()
-    handler = ValetonTempoHandler(channel=3)
-    handler.handle(100.0, writer)
-    assert writer.processed[0].channel == 3
-    assert writer.processed[1].channel == 3
+    msgs = ValetonTempoHandler(channels=[3]).handle(100.0)
+    assert msgs[0].channel == 3
+    assert msgs[1].channel == 3
+
+def test_valeton_multi_channel_emits_pair_per_channel():
+    msgs = ValetonTempoHandler(channels=[0, 1, 2]).handle(120.0)
+    assert len(msgs) == 6  # 2 CC messages × 3 channels
+
+def test_valeton_multi_channel_correct_channels():
+    msgs = ValetonTempoHandler(channels=[0, 1]).handle(120.0)
+    assert msgs[0].channel == 0
+    assert msgs[1].channel == 0
+    assert msgs[2].channel == 1
+    assert msgs[3].channel == 1

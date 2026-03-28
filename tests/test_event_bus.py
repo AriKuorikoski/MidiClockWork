@@ -43,3 +43,16 @@ def test_unsubscribe():
 def test_emit_unknown_event():
     bus = EventBus()
     bus.emit("nonexistent")  # Should not raise
+
+
+def test_unsubscribe_nonexistent_handler_does_not_raise():
+    bus = EventBus()
+    handler = lambda: None
+    bus.off("nonexistent_event", handler)  # event never registered
+
+def test_unsubscribe_handler_not_in_list_does_not_raise():
+    bus = EventBus()
+    handler_a = lambda: None
+    handler_b = lambda: None
+    bus.on("test", handler_a)
+    bus.off("test", handler_b)  # handler_b was never registered

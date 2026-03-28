@@ -39,3 +39,4 @@ python -m pytest tests/ -v
 - [Development setup](docs/setup.md)
 - [Circuit schematic](docs/schematic.md)
 - [Bill of materials](docs/bom.md)
+- [Known issues](KNOWN_ISSUES.md)

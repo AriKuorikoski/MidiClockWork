@@ -1,0 +1,27 @@
+{
+  "inputs": [
+    {
+      "name": "IN",
+      "uart": 0,
+      "rx_pin": 1,
+      "filter": {
+        "channels": [0],
+        "include_global": true
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "OUT1",
+      "uart": 1,
+      "tx_pin": 4,
+      "filter": {
+        "channels": [0]
+      },
+      "tempo_handler": {
+        "type": "valeton",
+        "channels": [0]
+      }
+    }
+  ]
+}

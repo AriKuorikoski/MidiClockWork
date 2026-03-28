@@ -1,41 +1,27 @@
-from machine import Pin, UART
+from machine import Pin
 import time
-from event_bus import EventBus
-from midi_clock_tracker import MidiClockTracker
-from midi_input import MidiInput
-from midi_output import MidiOutput
-from midi_router import MidiRouter
-from tempo_to_cc import ValetonTempoHandler
-from uart_writer import MessageFilter, UartWriter
+from config import Config
+from system_builder import SystemBuilder
 
 # Hardware
 tempo_led = Pin(15, Pin.OUT)
-wireless_led = Pin(16, Pin.OUT)
-button = Pin(14, Pin.IN, Pin.PULL_UP)
 
-# MIDI hardware
-midi_uart_in = UART(0, baudrate=31250, rx=Pin(1))
-midi_uart_out1 = UART(1, baudrate=31250, tx=Pin(4))
-
-# Event system
-bus = EventBus()
-
-# Components
-midi_in = MidiInput("IN", midi_uart_in, bus)
-clock = MidiClockTracker(bus)
-router = MidiRouter(bus, clock)
-
-# OUT1: pass everything through
-midi_out = MidiOutput("OUT1", 
-                      bus, 
-                      UartWriter(midi_uart_out1, MessageFilter()),
-                      ValetonTempoHandler(0))
+# Load configuration and build the system
+try:
+    system = SystemBuilder().build(Config.from_file("config.json"))
+except OSError as e:
+    print("ERROR: config.json not found -", e)
+    raise
+except Exception as e:
+    print("ERROR: failed to load config -", e)
+    raise
 
 # Tempo LED blinks on beat
-bus.on("beat", lambda: tempo_led.toggle())
+system.bus.on("beat", lambda: tempo_led.toggle())
 
 print("MidiClockWork starting...")
 
 while True:
-    midi_in.poll()
+    for midi_in in system.inputs:
+        midi_in.poll()
     time.sleep_ms(1)

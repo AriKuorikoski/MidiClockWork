@@ -84,18 +84,28 @@ def test_base_tempo_handler_ignores_tempo_change():
 
 
 def test_valeton_handler_writes_cc_on_tempo_change():
-    bus, output, uart = make_output(tempo_handler=ValetonTempoHandler(channel=0))
+    bus, output, uart = make_output(tempo_handler=ValetonTempoHandler(channels=[0]))
     bus.emit("tempo_changed", 120.0)
     assert len(uart.written) == 2
-    assert uart.written[0] == bytes([0xB0, 73, 0])    # CC73 = 0 (range 0)
-    assert uart.written[1] == bytes([0xB0, 74, 120])  # CC74 = 120
+    assert uart.written[0] == bytes([0xB0, 73, 0])
+    assert uart.written[1] == bytes([0xB0, 74, 120])
 
 
 def test_valeton_handler_uses_channel():
-    bus, output, uart = make_output(tempo_handler=ValetonTempoHandler(channel=3))
+    bus, output, uart = make_output(tempo_handler=ValetonTempoHandler(channels=[3]))
     bus.emit("tempo_changed", 120.0)
     assert uart.written[0] == bytes([0xB3, 73, 0])
     assert uart.written[1] == bytes([0xB3, 74, 120])
+
+
+def test_valeton_multi_channel_writes_pair_per_channel():
+    bus, output, uart = make_output(tempo_handler=ValetonTempoHandler(channels=[0, 1]))
+    bus.emit("tempo_changed", 120.0)
+    assert len(uart.written) == 4
+    assert uart.written[0] == bytes([0xB0, 73, 0])
+    assert uart.written[1] == bytes([0xB0, 74, 120])
+    assert uart.written[2] == bytes([0xB1, 73, 0])
+    assert uart.written[3] == bytes([0xB1, 74, 120])
 
 
 def test_two_outputs_are_independent():
@@ -110,8 +120,19 @@ def test_two_outputs_are_independent():
     assert len(uart2.written) == 1
 
     bus.emit("midi_out", MidiMessage(NOTE_ON, channel=0, data1=60, data2=100))
-    assert len(uart1.written) == 1  # clock filter blocks note
+    assert len(uart1.written) == 1
     assert len(uart2.written) == 2
+
+
+def test_valeton_cc_blocked_by_output_cc_number_filter():
+    # If the output filter excludes CC73/74, tempo CCs are silently dropped.
+    # This test documents that behaviour so it's visible if the design changes.
+    bus, output, uart = make_output(
+        MessageFilter(types={CC}, cc_numbers={7, 11}),  # excludes CC73 and CC74
+        tempo_handler=ValetonTempoHandler(channels=[0])
+    )
+    bus.emit("tempo_changed", 120.0)
+    assert uart.written == []  # silently dropped by the output filter
 
 
 def test_tempo_only_affects_output_with_valeton_handler():
@@ -119,7 +140,7 @@ def test_tempo_only_affects_output_with_valeton_handler():
     uart1 = MockUart()
     uart2 = MockUart()
     out1 = MidiOutput("out1", bus, UartWriter(uart1, MessageFilter()))
-    out2 = MidiOutput("out2", bus, UartWriter(uart2, MessageFilter()), ValetonTempoHandler(channel=0))
+    out2 = MidiOutput("out2", bus, UartWriter(uart2, MessageFilter()), ValetonTempoHandler(channels=[0]))
 
     bus.emit("tempo_changed", 120.0)
 

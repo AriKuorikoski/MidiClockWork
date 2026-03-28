@@ -138,3 +138,71 @@ def test_no_data_available():
     midi_in, uart, received = make_input()
     midi_in.poll()
     assert len(received) == 0
+
+
+# --- Input filter ---
+
+def make_filtered_input(input_filter):
+    bus = EventBus()
+    uart = MockUart()
+    midi_in = MidiInput("IN", uart, bus, input_filter=input_filter)
+    received = []
+    bus.on("midi_in", lambda msg: received.append(msg))
+    return midi_in, uart, received
+
+
+def test_filter_allows_matching_channel():
+    midi_in, uart, received = make_filtered_input({"channels": {0}, "include_global": True})
+    uart.send([0x90, 60, 100])  # NOTE_ON ch0
+    midi_in.poll()
+    assert len(received) == 1
+
+
+def test_filter_blocks_non_matching_channel():
+    midi_in, uart, received = make_filtered_input({"channels": {0}, "include_global": True})
+    uart.send([0x91, 60, 100])  # NOTE_ON ch1
+    midi_in.poll()
+    assert len(received) == 0
+
+
+def test_filter_passes_global_when_include_global_true():
+    midi_in, uart, received = make_filtered_input({"channels": {0}, "include_global": True})
+    uart.send([0xF8])  # CLOCK — no channel
+    midi_in.poll()
+    assert len(received) == 1
+
+
+def test_filter_blocks_global_when_include_global_false():
+    midi_in, uart, received = make_filtered_input({"channels": {0}, "include_global": False})
+    uart.send([0xF8])  # CLOCK
+    midi_in.poll()
+    assert len(received) == 0
+
+
+def test_filter_none_passes_all():
+    midi_in, uart, received = make_filtered_input(None)
+    uart.send([0x95, 60, 100])  # NOTE_ON ch5
+    uart.send([0xF8])
+    midi_in.poll()
+    assert len(received) == 2
+
+
+def test_two_inputs_independent_filters():
+    bus = EventBus()
+    uart0 = MockUart()
+    uart1 = MockUart()
+    in0 = MidiInput("IN0", uart0, bus, input_filter={"channels": {0}, "include_global": False})
+    in1 = MidiInput("IN1", uart1, bus, input_filter={"channels": {1}, "include_global": False})
+    received = []
+    bus.on("midi_in", lambda msg: received.append(msg))
+
+    uart0.send([0x90, 60, 100])  # ch0 from in0 — passes in0 filter
+    in0.poll()
+    uart1.send([0x91, 60, 100])  # ch1 from in1 — passes in1 filter
+    in1.poll()
+    uart0.send([0x91, 60, 100])  # ch1 from in0 — blocked by in0 filter
+    in0.poll()
+
+    assert len(received) == 2
+    assert received[0].channel == 0
+    assert received[1].channel == 1
