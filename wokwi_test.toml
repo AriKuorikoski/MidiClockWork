@@ -4,8 +4,10 @@ firmware = "firmware/RPI_PICO-20251209-v1.27.0.uf2"
 elf = ""
 rfc2217ServerPort = 4000
 
+# repl_test.py is mounted as main.py so the Pico runs it on boot
 [[fs]]
-path = "src/main.py"
+path = "src/repl_test.py"
+name = "main.py"
 
 [[fs]]
 path = "src/event_bus.py"
@@ -39,12 +41,3 @@ path = "src/system_builder.py"
 
 [[fs]]
 path = "src/config.json"
-
-[[fs]]
-path = "src/repl_test.py"
-
-[[fs]]
-path = "src/transport_ble.py"
-
-[[fs]]
-path = "src/transport_usb.py"

@@ -200,3 +200,54 @@ def test_two_inputs_with_independent_filters():
     system.inputs[0].poll()
 
     assert len(uarts[1].written) == 2
+
+
+# --- BLE / USB transport overrides ---
+
+def test_ble_input_uses_override():
+    cfg = {
+        "inputs": [{"name": "BLE_IN", "type": "ble_midi"}],
+        "outputs": [{"name": "OUT1", "uart": 1, "tx_pin": 4, "filter": {}, "tempo_handler": None}],
+    }
+    mock_ble = MockUart()
+    factory, uarts = make_uart_factory()
+    system = SystemBuilder(
+        uart_factory=factory,
+        transport_overrides={"ble_midi": lambda: mock_ble},
+    ).build(Config(cfg))
+
+    mock_ble.send([0x90, 60, 100])
+    system.inputs[0].poll()
+    assert len(uarts[1].written) == 1
+
+
+def test_usb_output_uses_override():
+    cfg = {
+        "inputs": [{"name": "IN", "uart": 0, "rx_pin": 1}],
+        "outputs": [{"name": "USB_OUT", "type": "usb_midi", "filter": {}, "tempo_handler": None}],
+    }
+    mock_usb = MockUart()
+    factory, uarts = make_uart_factory()
+    system = SystemBuilder(
+        uart_factory=factory,
+        transport_overrides={"usb_midi": lambda: mock_usb},
+    ).build(Config(cfg))
+
+    system.bus.emit("midi_out", MidiMessage(NOTE_ON, channel=0, data1=60, data2=100))
+    assert len(mock_usb.written) == 1
+
+
+def test_ble_shared_between_input_and_output():
+    cfg = {
+        "inputs":  [{"name": "BLE_IN",  "type": "ble_midi"}],
+        "outputs": [{"name": "BLE_OUT", "type": "ble_midi", "filter": {}, "tempo_handler": None}],
+    }
+    instances = []
+    factory, _ = make_uart_factory()
+    system = SystemBuilder(
+        uart_factory=factory,
+        transport_overrides={"ble_midi": lambda: instances.append(MockUart()) or instances[-1]},
+    ).build(Config(cfg))
+
+    # Both input and output should use the same transport instance
+    assert len(instances) == 1

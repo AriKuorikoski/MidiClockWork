@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from config import Config
-from midi_system import MidiSystem
+from midi_system import MidiSystem, MockUart
 
 
 # ---------------------------------------------------------------------------
@@ -225,3 +225,53 @@ def test_input_filter_global_messages_pass():
     sys.send_bytes(0, [0x91, 60, 100])  # NOTE_ON ch1 — blocked
     assert len(sys.output_uart(1).written) == 1
     assert sys.output_uart(1).written[0] == bytes([0xF8])
+
+
+# ---------------------------------------------------------------------------
+# Scenario 12 — BLE MIDI input passthrough
+# ---------------------------------------------------------------------------
+
+def test_ble_input_note_on_passes_to_uart_output():
+    cfg = Config({
+        "inputs": [{"name": "BLE_IN", "type": "ble_midi"}],
+        "outputs": [{"name": "OUT1", "uart": 1, "tx_pin": 4, "filter": {}, "tempo_handler": None}],
+    })
+    sys = MidiSystem().build_from_config(cfg, transport_overrides={"ble_midi": MockUart})
+    sys.send_bytes("ble_midi", [0x90, 60, 100])
+    assert sys.output_uart(1).written == [bytes([0x90, 60, 100])]
+
+
+def test_ble_input_clock_triggers_tempo():
+    cfg = Config({
+        "inputs": [{"name": "BLE_IN", "type": "ble_midi"}],
+        "outputs": [{"name": "OUT1", "uart": 1, "tx_pin": 4, "filter": {},
+                     "tempo_handler": {"type": "valeton", "channels": [0]}}],
+    })
+    sys = MidiSystem().build_from_config(cfg, transport_overrides={"ble_midi": MockUart})
+    sys.send_clocks("ble_midi", 48, bpm=120)
+    cc_written = [c for c in sys.output_uart(1).written if len(c) == 3 and c[0] == 0xB0]
+    assert len(cc_written) >= 2
+
+
+# ---------------------------------------------------------------------------
+# Scenario 13 — USB MIDI output
+# ---------------------------------------------------------------------------
+
+def test_uart_input_note_on_to_usb_output():
+    cfg = Config({
+        "inputs": [{"name": "IN", "uart": 0, "rx_pin": 1}],
+        "outputs": [{"name": "USB_OUT", "type": "usb_midi", "filter": {}, "tempo_handler": None}],
+    })
+    sys = MidiSystem().build_from_config(cfg, transport_overrides={"usb_midi": MockUart})
+    sys.send_bytes(0, [0x90, 60, 100])
+    assert sys.output_uart("usb_midi").written == [bytes([0x90, 60, 100])]
+
+
+def test_usb_output_clock_passes():
+    cfg = Config({
+        "inputs": [{"name": "IN", "uart": 0, "rx_pin": 1}],
+        "outputs": [{"name": "USB_OUT", "type": "usb_midi", "filter": {}, "tempo_handler": None}],
+    })
+    sys = MidiSystem().build_from_config(cfg, transport_overrides={"usb_midi": MockUart})
+    sys.send_bytes(0, [0xF8])
+    assert sys.output_uart("usb_midi").written == [bytes([0xF8])]

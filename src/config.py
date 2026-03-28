@@ -3,6 +3,8 @@ try:
 except ImportError:
     import json
 
+_TRANSPORT_TYPES = {"uart", "ble_midi", "usb_midi"}
+
 _TYPE_MAP = {
     "note_on":          0x90,
     "note_off":         0x80,
@@ -39,25 +41,39 @@ class Config:
 
 
 def _parse_input(d):
-    for key in ("name", "uart", "rx_pin"):
-        if key not in d:
-            raise ConfigError("input missing required field: " + key)
+    if "name" not in d:
+        raise ConfigError("input missing required field: name")
+    transport = d.get("type", "uart")
+    if transport not in _TRANSPORT_TYPES:
+        raise ConfigError("unknown input transport type: " + transport)
+    if transport == "uart":
+        for key in ("uart", "rx_pin"):
+            if key not in d:
+                raise ConfigError("uart input missing required field: " + key)
     return {
-        "name":    d["name"],
-        "uart":    d["uart"],
-        "rx_pin":  d["rx_pin"],
-        "filter":  _parse_input_filter(d.get("filter", {})),
+        "name":      d["name"],
+        "type":      transport,
+        "uart":      d.get("uart"),
+        "rx_pin":    d.get("rx_pin"),
+        "filter":    _parse_input_filter(d.get("filter", {})),
     }
 
 
 def _parse_output(d):
-    for key in ("name", "uart", "tx_pin"):
-        if key not in d:
-            raise ConfigError("output missing required field: " + key)
+    if "name" not in d:
+        raise ConfigError("output missing required field: name")
+    transport = d.get("type", "uart")
+    if transport not in _TRANSPORT_TYPES:
+        raise ConfigError("unknown output transport type: " + transport)
+    if transport == "uart":
+        for key in ("uart", "tx_pin"):
+            if key not in d:
+                raise ConfigError("uart output missing required field: " + key)
     return {
         "name":          d["name"],
-        "uart":          d["uart"],
-        "tx_pin":        d["tx_pin"],
+        "type":          transport,
+        "uart":          d.get("uart"),
+        "tx_pin":        d.get("tx_pin"),
         "filter":        _parse_output_filter(d.get("filter", {})),
         "tempo_handler": _parse_tempo_handler(d.get("tempo_handler")),
     }

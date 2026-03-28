@@ -35,6 +35,7 @@ def test_minimal_input():
     cfg = parse(inputs=[make_input()])
     assert len(cfg.inputs) == 1
     assert cfg.inputs[0]["name"] == "IN"
+    assert cfg.inputs[0]["type"] == "uart"
     assert cfg.inputs[0]["uart"] == 0
     assert cfg.inputs[0]["rx_pin"] == 1
 
@@ -42,8 +43,53 @@ def test_minimal_output():
     cfg = parse(outputs=[make_output()])
     assert len(cfg.outputs) == 1
     assert cfg.outputs[0]["name"] == "OUT1"
+    assert cfg.outputs[0]["type"] == "uart"
     assert cfg.outputs[0]["uart"] == 1
     assert cfg.outputs[0]["tx_pin"] == 4
+
+
+# --- Transport type ---
+
+def test_input_type_defaults_to_uart():
+    cfg = parse(inputs=[make_input()])
+    assert cfg.inputs[0]["type"] == "uart"
+
+def test_output_type_defaults_to_uart():
+    cfg = parse(outputs=[make_output()])
+    assert cfg.outputs[0]["type"] == "uart"
+
+def test_input_ble_midi_type():
+    cfg = parse(inputs=[{"name": "BLE_IN", "type": "ble_midi"}])
+    assert cfg.inputs[0]["type"] == "ble_midi"
+    assert cfg.inputs[0]["uart"] is None
+    assert cfg.inputs[0]["rx_pin"] is None
+
+def test_output_ble_midi_type():
+    cfg = parse(outputs=[{"name": "BLE_OUT", "type": "ble_midi"}])
+    assert cfg.outputs[0]["type"] == "ble_midi"
+    assert cfg.outputs[0]["uart"] is None
+    assert cfg.outputs[0]["tx_pin"] is None
+
+def test_input_usb_midi_type():
+    cfg = parse(inputs=[{"name": "USB_IN", "type": "usb_midi"}])
+    assert cfg.inputs[0]["type"] == "usb_midi"
+
+def test_output_usb_midi_type():
+    cfg = parse(outputs=[{"name": "USB_OUT", "type": "usb_midi"}])
+    assert cfg.outputs[0]["type"] == "usb_midi"
+
+def test_unknown_transport_type_raises():
+    with pytest.raises(ConfigError):
+        parse(inputs=[{"name": "IN", "type": "infrared"}])
+
+def test_ble_input_does_not_require_uart_fields():
+    # Should not raise even though uart/rx_pin are absent
+    cfg = parse(inputs=[{"name": "BLE_IN", "type": "ble_midi"}])
+    assert cfg.inputs[0]["type"] == "ble_midi"
+
+def test_uart_input_still_requires_uart_and_rx_pin():
+    with pytest.raises(ConfigError):
+        parse(inputs=[{"name": "IN", "type": "uart", "rx_pin": 1}])  # missing uart
 
 
 # --- Input filter ---

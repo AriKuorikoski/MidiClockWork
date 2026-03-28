@@ -77,7 +77,7 @@ class MidiSystem:
         self._uarts = {}
         self._system = None
 
-    def build_from_config(self, config):
+    def build_from_config(self, config, transport_overrides=None):
         from system_builder import SystemBuilder
 
         def uart_factory(uart_id, baudrate, tx_pin=None, rx_pin=None):
@@ -85,7 +85,21 @@ class MidiSystem:
             self._uarts[uart_id] = uart
             return uart
 
-        self._system = SystemBuilder(uart_factory=uart_factory).build(config)
+        # Wrap transport overrides so their mock instances are also registered
+        # in self._uarts under a string key (e.g. "ble_midi", "usb_midi")
+        wrapped_overrides = {}
+        if transport_overrides:
+            for key, factory in transport_overrides.items():
+                def _wrap(k=key, f=factory):
+                    mock = f()
+                    self._uarts[k] = mock
+                    return mock
+                wrapped_overrides[key] = _wrap
+
+        self._system = SystemBuilder(
+            uart_factory=uart_factory,
+            transport_overrides=wrapped_overrides,
+        ).build(config)
         return self
 
     def send_bytes(self, uart_id, data):
