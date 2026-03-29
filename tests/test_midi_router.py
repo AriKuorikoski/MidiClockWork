@@ -7,20 +7,16 @@ import time
 
 class MockTime:
     def __init__(self):
-        self._us = 0
+        self._ns = 0
 
-    def ticks_us(self):
-        return self._us
+    def monotonic_ns(self):
+        return self._ns
 
-    def ticks_diff(self, a, b):
-        return a - b
-
-    def advance_us(self, us):
-        self._us += us
+    def advance_ns(self, ns):
+        self._ns += ns
 
 mock_time = MockTime()
-time.ticks_us = mock_time.ticks_us
-time.ticks_diff = mock_time.ticks_diff
+time.monotonic_ns = mock_time.monotonic_ns
 
 from event_bus import EventBus
 from midi_message import MidiMessage, NOTE_ON, CC, CLOCK, START
@@ -55,9 +51,9 @@ def test_clock_reaches_tracker():
     beats = []
     bus.on("beat", lambda: beats.append(True))
 
-    tick_us = 20833
+    tick_ns = 20_833_000
     for i in range(24):
-        mock_time.advance_us(tick_us)
+        mock_time.advance_ns(tick_ns)
         bus.emit("midi_in", MidiMessage(CLOCK))
 
     assert len(beats) == 1

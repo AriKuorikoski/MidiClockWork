@@ -46,26 +46,22 @@ class MockTime:
     """Controls time for MidiClockTracker's BPM calculations."""
 
     def __init__(self):
-        self._us = 0
+        self._ns = 0
 
-    def ticks_us(self):
-        return self._us
+    def monotonic_ns(self):
+        return self._ns
 
-    def ticks_diff(self, a, b):
-        return a - b
-
-    def advance_us(self, us):
-        self._us += us
+    def advance_ns(self, ns):
+        self._ns += ns
 
     def advance_for_bpm(self, bpm, ticks=1):
         """Advance time by the interval for <ticks> MIDI clock ticks at <bpm>."""
-        tick_us = int(60_000_000 // (bpm * 24))
-        self._us += tick_us * ticks
+        tick_ns = int(60_000_000_000 // (bpm * 24))
+        self._ns += tick_ns * ticks
 
     def install(self):
         """Patch the time module used by MidiClockTracker."""
-        _time_module.ticks_us = self.ticks_us
-        _time_module.ticks_diff = self.ticks_diff
+        _time_module.monotonic_ns = self.monotonic_ns
 
 
 class MidiSystem:

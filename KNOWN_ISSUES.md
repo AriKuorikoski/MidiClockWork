@@ -39,9 +39,25 @@ Active Sensing (`0xFE`) is a system real-time byte sent every ~300ms by some dev
 
 ## 4. Clock jitter from fixed poll delay
 
-**Status:** Present in `main.py`
+**Status:** Present in `code.py`
 **Impact:** Medium — degrades tempo accuracy
 
-`time.sleep_ms(1)` in the main loop adds up to 1ms of latency per iteration. At 120 BPM the CLOCK tick interval is ~20.8ms, so each sleep can add ~5% jitter per tick. This worsens at higher BPM.
+`time.sleep(0.001)` in the main loop adds up to 1ms of latency per iteration. At 120 BPM the CLOCK tick interval is ~20.8ms, so each sleep can add ~5% jitter per tick. This worsens at higher BPM.
 
-**Fix:** Remove the sleep and poll as fast as possible, or switch to interrupt-driven UART reading (if supported by MicroPython on RP2040) to decouple timing from the poll loop.
+**Fix:** Remove the sleep and poll as fast as possible, or switch to interrupt-driven UART reading to decouple timing from the poll loop.
+
+---
+
+## Resolved
+
+### BLE MIDI iOS pairing (resolved by CircuitPython port)
+
+MicroPython's BTstack on Pico W did not support the security manager protocol required by iOS CoreMIDI for BLE MIDI connections. The device could be discovered but never completed the MIDI handshake.
+
+**Resolution:** Ported to CircuitPython with `adafruit_ble_midi`, which handles iOS pairing automatically.
+
+### USB MIDI module missing (resolved by CircuitPython port)
+
+MicroPython's standard Pico W firmware did not include the `usb.device.midi` module needed for USB MIDI.
+
+**Resolution:** CircuitPython includes the `usb_midi` module built-in.

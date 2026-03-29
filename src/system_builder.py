@@ -3,7 +3,7 @@ from midi_clock_tracker import MidiClockTracker
 from midi_input import MidiInput
 from midi_output import MidiOutput
 from midi_router import MidiRouter
-from uart_writer import MessageFilter, UartWriter
+from uart_writer import ConsoleWriter, MessageFilter, UartWriter
 from tempo_to_cc import ValetonTempoHandler
 
 
@@ -17,7 +17,7 @@ class BuiltSystem:
 class SystemBuilder:
     def __init__(self, uart_factory=None, transport_overrides=None):
         # uart_factory(uart_id, baudrate, tx_pin=None, rx_pin=None) -> transport
-        # None = use machine.UART (hardware path)
+        # None = use busio.UART (hardware path)
         # transport_overrides: {"ble_midi": callable, "usb_midi": callable}
         #   Each callable takes no arguments and returns a transport object.
         #   Used in tests to inject mock transports for non-UART types.
@@ -51,7 +51,7 @@ class SystemBuilder:
                 cc_numbers=f["cc_numbers"],
             )
             tempo_handler = _make_tempo_handler(out["tempo_handler"])
-            writer = UartWriter(transport, msg_filter)
+            writer = _make_writer(out["writer"], transport, msg_filter)
             outputs.append(MidiOutput(out["name"], bus, writer, tempo_handler))
 
         return BuiltSystem(bus, inputs, outputs)
@@ -79,7 +79,19 @@ class SystemBuilder:
             from transport_usb import UsbMidiTransport
             return UsbMidiTransport()
 
+        if t == "serial":
+            if t in self._transport_overrides:
+                return self._transport_overrides[t]()
+            from transport_serial import SerialTransport
+            return SerialTransport()
+
         raise ValueError("unknown transport type: " + t)
+
+
+def _make_writer(writer_type, transport, msg_filter):
+    if writer_type == "console":
+        return ConsoleWriter()
+    return UartWriter(transport, msg_filter)
 
 
 def _make_tempo_handler(handler_cfg):
@@ -91,10 +103,17 @@ def _make_tempo_handler(handler_cfg):
 
 
 def _default_uart_factory(uart_id, baudrate, tx_pin=None, rx_pin=None):
-    from machine import UART, Pin
-    kwargs = {"baudrate": baudrate}
-    if tx_pin is not None:
-        kwargs["tx"] = Pin(tx_pin)
-    if rx_pin is not None:
-        kwargs["rx"] = Pin(rx_pin)
-    return UART(uart_id, **kwargs)
+    import board
+    import busio
+
+    def _pin(n):
+        return getattr(board, "GP{}".format(n))
+
+    if tx_pin is not None and rx_pin is not None:
+        return busio.UART(_pin(tx_pin), _pin(rx_pin), baudrate=baudrate)
+    elif tx_pin is not None:
+        return busio.UART(_pin(tx_pin), None, baudrate=baudrate)
+    elif rx_pin is not None:
+        return busio.UART(None, _pin(rx_pin), baudrate=baudrate)
+    else:
+        raise ValueError("UART requires at least tx_pin or rx_pin")

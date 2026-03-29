@@ -18,7 +18,8 @@ Commands (no Enter needed):
 
 import sys
 import time
-from machine import Pin
+import board
+import digitalio
 
 from event_bus import EventBus
 from midi_clock_tracker import MidiClockTracker
@@ -80,8 +81,9 @@ _out_uart = _PrintUart()
 _writer = UartWriter(_out_uart, MessageFilter())
 _output = MidiOutput("OUT1", bus, _writer, ValetonTempoHandler(channels=[0]))
 
-tempo_led = Pin(15, Pin.OUT)
-bus.on("beat", lambda: tempo_led.toggle())
+tempo_led = digitalio.DigitalInOut(board.LED)
+tempo_led.direction = digitalio.Direction.OUTPUT
+bus.on("beat", lambda: setattr(tempo_led, 'value', not tempo_led.value))
 bus.on("tempo_changed", lambda bpm: print("  *** TEMPO {:.1f} BPM".format(bpm)))
 
 
@@ -93,9 +95,9 @@ _CLOCK_BPM = 120.0
 
 
 def _send_clocks(n, bpm=_CLOCK_BPM):
-    interval_us = int(60_000_000 / bpm / 24)
+    interval_s = 60.0 / bpm / 24
     for _ in range(n):
-        time.sleep_us(interval_us)
+        time.sleep(interval_s)
         bus.emit("midi_in", MidiMessage(CLOCK))
 
 

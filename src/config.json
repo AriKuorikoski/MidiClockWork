@@ -1,23 +1,18 @@
 {
   "inputs": [
     {
-      "name": "IN",
-      "uart": 0,
-      "rx_pin": 1,
-      "filter": {
-        "channels": [0],
-        "include_global": true
-      }
+      "name": "USB_IN",
+      "type": "usb_midi"
     }
   ],
   "outputs": [
     {
       "name": "OUT1",
+      "type": "uart",
       "uart": 1,
       "tx_pin": 4,
-      "filter": {
-        "channels": [0]
-      },
+      "writer": "console",
+      "filter": {},
       "tempo_handler": {
         "type": "valeton",
         "channels": [0]

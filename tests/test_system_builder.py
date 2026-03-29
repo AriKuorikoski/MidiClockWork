@@ -6,15 +6,12 @@ import time
 
 class MockTime:
     def __init__(self):
-        self._us = 0
-    def ticks_us(self):
-        return self._us
-    def ticks_diff(self, a, b):
-        return a - b
+        self._ns = 0
+    def monotonic_ns(self):
+        return self._ns
 
 mock_time = MockTime()
-time.ticks_us = mock_time.ticks_us
-time.ticks_diff = mock_time.ticks_diff
+time.monotonic_ns = mock_time.monotonic_ns
 
 from config import Config
 from system_builder import SystemBuilder, BuiltSystem

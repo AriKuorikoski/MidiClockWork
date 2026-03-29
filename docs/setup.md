@@ -9,7 +9,8 @@
 ## Step 1: Install dependencies
 
 ```
-python -m pip install pytest mpremote
+python -m pip install pytest pyserial
+pip install circup
 ```
 
 ## Step 2: VS Code Python interpreter
@@ -31,64 +32,70 @@ python -m pytest tests/ -v
 
 Or use the **Test Explorer** panel in VS Code (flask icon in the sidebar).
 
-## Step 4: Flash MicroPython on the Pico WH
+## Step 4: Flash CircuitPython on the Pico WH
 
-1. Download the latest stable MicroPython `.uf2` from https://micropython.org/download/RPI_PICO_W/
-2. Hold the **BOOTSEL** button on the Pico WH
-3. While holding, plug in USB to your PC
-4. Release the button — a USB drive called **RPI-RP2** appears
-5. Drag and drop the `.uf2` file onto the drive
-6. The Pico reboots into MicroPython
+You have a **Pico WH** (Pico W with headers). You must use the **Pico W** CircuitPython firmware.
 
-## Step 5: Deploy to Pico
+A firmware file is included in the `firmware/` folder: `adafruit-circuitpython-raspberry_pi_pico_w-en_GB-10.1.4.uf2`.
 
-Upload all source files from `src/` to the Pico's root filesystem:
+> The `firmware/` folder also contains a MicroPython file (`RPI_PICO-*.uf2`). **Do not use it** — this project has been ported to CircuitPython.
 
-```
-mpremote fs cp src/main.py :main.py
-mpremote fs cp src/event_bus.py :event_bus.py
-mpremote fs cp src/midi_message.py :midi_message.py
-mpremote fs cp src/midi_input.py :midi_input.py
-mpremote fs cp src/midi_output.py :midi_output.py
-mpremote fs cp src/midi_clock_tracker.py :midi_clock_tracker.py
-```
+1. Hold the **BOOTSEL** button on the Pico WH
+2. While holding, plug in the USB data cable to your PC
+3. Release the button — a USB drive called **RPI-RP2** appears in Explorer
+4. Drag and drop the CircuitPython `.uf2` file onto the drive
+5. The drive disappears and reappears as **CIRCUITPY**
 
-## Step 6: Interactive test harness (Wokwi)
-
-Upload all modules and launch the interactive MIDI test harness in one command:
+**Verify the firmware is working:** The CIRCUITPY drive should appear in Explorer. You can also connect via serial:
 
 ```
-bash run_test_harness.sh
+# Find the REPL serial port
+python -c "import serial.tools.list_ports; [print(p.device, p.description) for p in serial.tools.list_ports.comports()]"
 ```
 
-Type `h` in the terminal for the list of commands (`C` sends a beat, `n` sends NOTE_ON, etc.).
-The Wokwi simulator must already be running in VS Code before executing this script.
+Connect to the REPL COM port with a serial terminal (PuTTY, VS Code serial monitor, etc.) at any baud rate. Press Enter to get a `>>>` prompt.
 
-## Step 7: Wokwi emulator (optional, manual upload)
+**To reflash later:** Hold BOOTSEL while plugging in — the `RPI-RP2` drive reappears and you can drop a new `.uf2` onto it.
 
-The Wokwi emulator can be used to test with simulated hardware (LEDs, buttons).
+## Step 5: Install CircuitPython libraries
+
+The BLE MIDI transport requires Adafruit libraries. Install them using `circup`:
+
+```
+circup install adafruit_ble adafruit_ble_midi
+```
+
+Or manually download the [Adafruit CircuitPython Bundle](https://circuitpython.org/libraries) and copy `adafruit_ble/` and `adafruit_ble_midi/` to `CIRCUITPY/lib/`.
+
+## Step 6: Deploy to Pico
+
+Copy all source files from `src/` to the CIRCUITPY drive:
+
+```powershell
+.\deploy.ps1
+```
+
+The script auto-detects the CIRCUITPY drive and copies all files. CircuitPython auto-reloads when files change — no manual reset needed.
+
+To deploy manually, copy all `.py` and `.json` files from `src/` to the root of the CIRCUITPY drive. The entry point is `code.py` (runs automatically on boot).
+
+## Step 7: Interactive test harness (Wokwi)
+
+The Wokwi emulator can be used to test with simulated hardware. Note that BLE and USB MIDI are not available in the emulator.
 
 1. Open the project in VS Code
 2. Start simulator: `F1` → "Wokwi: Start Simulator"
-3. Upload modules and run:
+3. The test harness (`repl_test.py`) can be loaded for interactive testing
 
-```
-mpremote connect port:rfc2217://localhost:4000 fs cp src/event_bus.py :event_bus.py
-mpremote connect port:rfc2217://localhost:4000 fs cp src/midi_message.py :midi_message.py
-mpremote connect port:rfc2217://localhost:4000 fs cp src/midi_input.py :midi_input.py
-mpremote connect port:rfc2217://localhost:4000 fs cp src/midi_output.py :midi_output.py
-mpremote connect port:rfc2217://localhost:4000 fs cp src/midi_clock_tracker.py :midi_clock_tracker.py
-mpremote connect port:rfc2217://localhost:4000 run src/main.py
-```
-
-Note: The emulator filesystem resets when stopped — files must be re-uploaded each time.
+Type `h` in the terminal for the list of commands (`C` sends a beat, `n` sends NOTE_ON, etc.).
 
 ## Project structure
 
 ```
 MidiClockWork/
-├── src/                      # Source modules (deployed to Pico root)
-│   ├── main.py               # Entry point
+├── src/                      # Source modules (deployed to CIRCUITPY root)
+│   ├── code.py               # Entry point (CircuitPython runs this on boot)
+│   ├── boot.py               # USB config (MIDI + dual CDC serial)
 │   ├── config.py             # JSON config loader
 │   ├── config.json           # Default device configuration
 │   ├── system_builder.py     # Wires all components from config
@@ -98,20 +105,60 @@ MidiClockWork/
 │   ├── midi_output.py        # Bus subscriber, delegates to writer + tempo handler
 │   ├── midi_router.py        # Routes midi_in → clock tracker + midi_out
 │   ├── midi_clock_tracker.py # BPM calculation, beat/tempo/transport events
-│   ├── uart_writer.py        # MessageFilter + UartWriter (leaf output layer)
+│   ├── uart_writer.py        # MessageFilter + UartWriter + ConsoleWriter
 │   ├── tempo_to_cc.py        # ValetonTempoHandler: BPM → CC73+CC74
-│   ├── transport_ble.py      # BLE MIDI 1.0 transport (ubluetooth)
-│   ├── transport_usb.py      # USB MIDI 1.0 transport (usb module, v1.22+)
-│   └── repl_test.py          # Interactive test harness (run via mpremote)
+│   ├── transport_ble.py      # BLE MIDI transport (adafruit_ble_midi)
+│   ├── transport_usb.py      # USB MIDI transport (usb_midi)
+│   ├── transport_serial.py   # USB CDC serial transport (for PC testing)
+│   └── repl_test.py          # Interactive test harness
 ├── tests/                    # Unit + integration tests (pytest, desktop Python)
+├── tools/                    # PC-side utilities
+│   └── send_midi_clock.py    # Send MIDI clock over serial to Pico
 ├── docs/                     # Documentation
-├── firmware/                 # MicroPython UF2 firmware (gitignored)
+├── firmware/                 # CircuitPython UF2 firmware
 ├── diagram.json              # Wokwi circuit diagram
-├── wokwi.toml                # Wokwi config (normal mode)
-├── wokwi_test.toml           # Wokwi config (test harness mode)
-├── run_test_harness.ps1      # Upload + run interactive harness (PowerShell)
-└── KNOWN_ISSUES.md           # Known show-stopper bugs
+├── wokwi.toml                # Wokwi config
+├── deploy.ps1                # Deploy source to CIRCUITPY drive
+└── KNOWN_ISSUES.md           # Known bugs and limitations
 ```
+
+---
+
+## Debugging with a console output
+
+Any output can be switched to print MIDI messages to the serial console instead of sending them out a physical port. This is useful when you want to verify the pipeline is working before the target device (e.g. Valeton GP-50) is connected.
+
+Add `"writer": "console"` to an output in `config.json`:
+
+```json
+{
+  "inputs": [
+    { "name": "BLE_IN", "type": "ble_midi" }
+  ],
+  "outputs": [
+    {
+      "name": "DEBUG",
+      "type": "uart",
+      "uart": 1,
+      "tx_pin": 4,
+      "writer": "console",
+      "tempo_handler": { "type": "valeton", "channels": [0] }
+    }
+  ]
+}
+```
+
+Example output at 120 BPM with the Valeton tempo handler active:
+
+```
+CLOCK
+CLOCK
+...
+CC             ch=0 data1=73 data2=0
+CC             ch=0 data1=74 data2=120
+```
+
+To switch back to real output, remove `"writer": "console"` (it defaults to `"uart"`).
 
 ---
 
@@ -123,10 +170,10 @@ Tests the full clock→tempo-CC pipeline using only the Pico WH and its USB cabl
 No optocoupler, TRS jacks, or other components required.
 
 **Hardware needed:**
-- Raspberry Pi Pico WH
+- Raspberry Pi Pico WH with CircuitPython
 - USB cable (Pico → PC)
 - iPhone with a BLE MIDI app (e.g. MIDI Wrench, free on App Store)
-- PC with a MIDI monitor app (e.g. MIDI-OX on Windows)
+- PC with a MIDI monitor app (e.g. MIDIView on Windows)
 
 **Config (`src/config.json`):**
 ```json
@@ -146,25 +193,21 @@ No optocoupler, TRS jacks, or other components required.
 ```
 
 **Steps:**
-1. Flash MicroPython firmware to Pico WH (see Step 4 above)
-2. Deploy all source files (see Step 5 above)
-3. Update `config.json` on the Pico with the config above
-4. Connect Pico to PC via USB — it should appear as a USB MIDI device
-5. Open MIDI monitor on PC, select the Pico as MIDI input
-6. On iPhone, open MIDI Wrench → connect to "MidiClockWork" via Bluetooth
-7. In MIDI Wrench, send MIDI clock (start a clock source at any BPM)
-8. On PC, observe CC73 + CC74 messages arriving on the MIDI monitor
+1. Flash CircuitPython firmware to Pico WH (see Step 4 above)
+2. Install Adafruit BLE libraries (see Step 5 above)
+3. Deploy all source files (see Step 6 above)
+4. Update `config.json` on the CIRCUITPY drive with the config above
+5. Connect Pico to PC via USB — it should appear as a USB MIDI device
+6. Open MIDI monitor on PC, select the Pico as MIDI input
+7. On iPhone, open MIDI Wrench → connect to "MidiClockWork" via Bluetooth
+8. In MIDI Wrench, send MIDI clock (start a clock source at any BPM)
+9. On PC, observe CC73 + CC74 messages arriving on the MIDI monitor
 
 **Expected output** (example at 120 BPM):
 ```
 CC  ch0  cc=73  val=0    ← MSB (range byte)
 CC  ch0  cc=74  val=120  ← LSB (BPM within range)
 ```
-
-**Note:** The USB transport uses `usb.device.midi` (MicroPython v1.22+) with
-`builtin_driver=True` to present a composite USB device (MIDI + serial REPL).
-If the REPL stops responding over USB, the composite mode may need adjustment
-— connect via Bluetooth serial or reflash to recover.
 
 ---
 
@@ -207,7 +250,38 @@ The production use case. Requires all components from [bom.md](bom.md).
 
 ---
 
+### Scenario C — Serial testing from PC (no phone or MIDI hardware needed)
+
+Uses the PC-side `send_midi_clock.py` tool to send MIDI clock over serial.
+
+**Config (`src/config.json`):**
+```json
+{
+  "inputs": [
+    { "name": "SERIAL_IN", "type": "serial" }
+  ],
+  "outputs": [
+    {
+      "name": "OUT1",
+      "type": "uart",
+      "uart": 1,
+      "tx_pin": 4,
+      "writer": "console",
+      "filter": {},
+      "tempo_handler": { "type": "valeton", "channels": [0] }
+    }
+  ]
+}
+```
+
+**Steps:**
+1. Deploy with the config above
+2. Identify the data COM port (the Pico shows two COM ports — one is the REPL, the other is the data port)
+3. Run: `python tools/send_midi_clock.py COM_DATA 120`
+4. Observe CC73 + CC74 messages and beat markers in the output
+
+---
+
 > **Note on folder structure:** Source modules are kept flat in `src/` for simplicity
-> and because MicroPython deploys to a flat filesystem. If the module count grows
-> significantly, consider reorganizing into subpackages (e.g. `messages/`, `handlers/`,
-> `io/`). MicroPython supports packages via `__init__.py` and searches `/lib` by default.
+> and because CircuitPython deploys to a flat filesystem. If the module count grows
+> significantly, consider reorganizing into subpackages.

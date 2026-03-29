@@ -16,6 +16,32 @@ class MessageFilter:
         return True
 
 
+_TYPE_NAMES = {
+    0x80: "NOTE_OFF", 0x90: "NOTE_ON",  0xA0: "AFTERTOUCH",
+    0xB0: "CC",       0xC0: "PC",       0xD0: "CHAN_PRESSURE",
+    0xE0: "PITCH_BEND",
+    0xF8: "CLOCK",    0xFA: "START",    0xFB: "CONTINUE",   0xFC: "STOP",
+}
+
+
+class ConsoleWriter:
+    """Drop-in replacement for UartWriter that prints MIDI messages to stdout.
+    Useful for testing on hardware without the target device connected."""
+
+    def __init__(self):
+        self.filter = MessageFilter()
+
+    def process(self, msg):
+        if msg.type == 0xF8:  # skip CLOCK — too noisy for console
+            return
+        name = _TYPE_NAMES.get(msg.type, "0x{:02X}".format(msg.type))
+        if msg.channel is not None:
+            print("{:<14} ch={} data1={} data2={}".format(
+                name, msg.channel, msg.data1, msg.data2))
+        else:
+            print(name)
+
+
 class UartWriter:
     def __init__(self, uart, msg_filter, generate=None):
         self.uart = uart

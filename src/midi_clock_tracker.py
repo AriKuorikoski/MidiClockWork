@@ -8,12 +8,15 @@ class MidiClockTracker:
     def __init__(self, event_bus):
         self.bus = event_bus
         self._tick_count = 0
-        self._last_tick_us = 0
+        self._last_ns = 0
         self._bpm = 0.0
         self._running = False
         # Average over 24 ticks (1 beat) for stable BPM
         self._tick_intervals = []
         self._max_intervals = TICKS_PER_BEAT
+        # Smooth BPM over last 10 readings to filter jitter
+        self._bpm_history = []
+        self._max_bpm_history = 10
 
     @property
     def bpm(self):
@@ -30,6 +33,7 @@ class MidiClockTracker:
             self._running = True
             self._tick_count = 0
             self._tick_intervals = []
+            self._bpm_history = []
             self.bus.emit("transport", "start")
         elif msg.type == CONTINUE:
             self._running = True
@@ -39,25 +43,28 @@ class MidiClockTracker:
             self.bus.emit("transport", "stop")
 
     def _on_tick(self):
-        now_us = time.ticks_us()
+        now_ns = time.monotonic_ns()
 
         # Calculate interval
-        if self._last_tick_us > 0:
-            interval = time.ticks_diff(now_us, self._last_tick_us)
+        if self._last_ns > 0:
+            interval = now_ns - self._last_ns
             self._tick_intervals.append(interval)
             if len(self._tick_intervals) > self._max_intervals:
                 self._tick_intervals.pop(0)
 
             # Recalculate BPM when we have enough samples
             if len(self._tick_intervals) >= TICKS_PER_BEAT:
-                avg_us = sum(self._tick_intervals) / len(self._tick_intervals)
-                new_bpm = 60_000_000 / (avg_us * TICKS_PER_BEAT)
-                # Only emit if BPM actually changed (rounded to 1 decimal)
-                if round(new_bpm, 1) != round(self._bpm, 1):
-                    self._bpm = new_bpm
+                avg_ns = sum(self._tick_intervals) / len(self._tick_intervals)
+                new_bpm = 60_000_000_000 / (avg_ns * TICKS_PER_BEAT)
+                self._bpm_history.append(new_bpm)
+                if len(self._bpm_history) > self._max_bpm_history:
+                    self._bpm_history.pop(0)
+                smoothed = sum(self._bpm_history) / len(self._bpm_history)
+                if round(smoothed) != round(self._bpm):
+                    self._bpm = smoothed
                     self.bus.emit("tempo_changed", self._bpm)
 
-        self._last_tick_us = now_us
+        self._last_ns = now_ns
 
         # Beat tracking
         self._tick_count += 1

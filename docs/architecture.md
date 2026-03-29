@@ -90,7 +90,7 @@ The system is configured via `src/config.json`. `SystemBuilder` reads this at st
 }
 ```
 
-**Transport types:** `"uart"`, `"ble_midi"`, `"usb_midi"`. Physical UART requires `uart` and `rx_pin`/`tx_pin`; BLE and USB do not.
+**Transport types:** `"uart"`, `"ble_midi"`, `"usb_midi"`, `"serial"`. Physical UART requires `uart` and `rx_pin`/`tx_pin`; BLE, USB, and serial do not.
 
 **Input filter** (`filter` on each input):
 - `channels` — list of MIDI channels to accept (0–15). Absent = all.
@@ -110,7 +110,7 @@ The system is configured via `src/config.json`. `SystemBuilder` reads this at st
 
 ## Layers
 
-### 1. Transports (`src/transport_ble.py`, `src/transport_usb.py`, `machine.UART`)
+### 1. Transports (`src/transport_ble.py`, `src/transport_usb.py`, `src/transport_serial.py`, `busio.UART`)
 
 **Purpose:** Abstract hardware I/O behind a two-method interface.
 
@@ -120,13 +120,16 @@ All transports implement the same minimal contract:
 
 | Transport | Module | Notes |
 |-----------|--------|-------|
-| Hardware UART | `machine.UART` | Physical TRS MIDI via GPIO pins |
-| BLE MIDI | `transport_ble.py` | BLE MIDI 1.0 peripheral; handles packet framing |
-| USB MIDI | `transport_usb.py` | USB MIDI 1.0 device; requires MicroPython v1.22+ |
+| Hardware UART | `busio.UART` | Physical TRS MIDI via GPIO pins |
+| BLE MIDI | `transport_ble.py` | Uses `adafruit_ble_midi` (requires nRF chip; Pico W BLE not yet supported) |
+| USB MIDI | `transport_usb.py` | Uses CircuitPython `usb_midi` module (built-in) |
+| Serial | `transport_serial.py` | USB CDC data port for PC-side testing |
 
-**BLE MIDI** advertises as a BLE MIDI peripheral. One underlying connection is shared if BLE is declared as both an input and an output. Packet framing (`ble_wrap` / `ble_unwrap`) adds/strips the 2-byte BLE MIDI header.
+**BLE MIDI** uses Adafruit's `adafruit_ble_midi` library which handles GATT service registration, BLE MIDI packet framing, advertising, and iOS pairing automatically. Note: requires a board with native BLE support (nRF52840). The Pico W's CYW43 chip is not yet supported by CircuitPython's `_bleio` module.
 
-**USB MIDI** registers as a USB MIDI 1.0 class device. Packet framing (`usb_wrap` / `usb_unwrap`) converts between raw MIDI bytes and 4-byte USB MIDI event packets.
+**USB MIDI** uses CircuitPython's built-in `usb_midi` module which handles all USB MIDI 1.0 protocol framing internally.
+
+**Serial** reads raw MIDI bytes from the USB CDC data port (`usb_cdc.data`), allowing a PC-side script to send MIDI for testing without MIDI hardware.
 
 Nothing above this layer knows which transport is in use.
 
@@ -166,7 +169,7 @@ Single point where "what happens to every incoming message" is decided.
 - Measures intervals between ticks to calculate BPM
 - Emits:
   - `"beat"` — every 24 clock ticks (one quarter note)
-  - `"tempo_changed"` — when calculated BPM changes (float, rounded to 1 decimal)
+  - `"tempo_changed"` — when calculated BPM changes (smoothed over 10 readings, rounded to integer)
   - `"transport"` — on Start / Stop / Continue with state string
 
 Consumers of these events don't need to know about MIDI clock bytes at all.
@@ -225,7 +228,7 @@ Carries: `type`, `channel`, `data1`, `data2`. Knows how to `serialize()` itself 
 |-------|-----------|---------|---------------|
 | `"midi_in"` | `MidiInput` | `MidiMessage` | `MidiRouter` |
 | `"midi_out"` | `MidiRouter` | `MidiMessage` | All `MidiOutput` instances |
-| `"beat"` | `MidiClockTracker` | none | Tempo LED (`main.py`) |
+| `"beat"` | `MidiClockTracker` | none | Tempo LED (`code.py`) |
 | `"tempo_changed"` | `MidiClockTracker` | `float` (BPM) | All `MidiOutput` instances |
 | `"transport"` | `MidiClockTracker` | `str` (`"start"` / `"stop"` / `"continue"`) | — |
 

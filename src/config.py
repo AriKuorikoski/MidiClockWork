@@ -1,9 +1,7 @@
-try:
-    import ujson as json
-except ImportError:
-    import json
+import json
 
-_TRANSPORT_TYPES = {"uart", "ble_midi", "usb_midi"}
+_TRANSPORT_TYPES = {"uart", "ble_midi", "usb_midi", "serial"}
+_WRITER_TYPES    = {"uart", "console"}
 
 _TYPE_MAP = {
     "note_on":          0x90,
@@ -69,11 +67,15 @@ def _parse_output(d):
         for key in ("uart", "tx_pin"):
             if key not in d:
                 raise ConfigError("uart output missing required field: " + key)
+    writer = d.get("writer", "uart")
+    if writer not in _WRITER_TYPES:
+        raise ConfigError("unknown writer type: " + writer)
     return {
         "name":          d["name"],
         "type":          transport,
         "uart":          d.get("uart"),
         "tx_pin":        d.get("tx_pin"),
+        "writer":        writer,
         "filter":        _parse_output_filter(d.get("filter", {})),
         "tempo_handler": _parse_tempo_handler(d.get("tempo_handler")),
     }

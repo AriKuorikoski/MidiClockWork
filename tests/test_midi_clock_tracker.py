@@ -7,20 +7,16 @@ import time
 
 class MockTime:
     def __init__(self):
-        self._us = 0
+        self._ns = 0
 
-    def ticks_us(self):
-        return self._us
+    def monotonic_ns(self):
+        return self._ns
 
-    def ticks_diff(self, a, b):
-        return a - b
-
-    def advance_us(self, us):
-        self._us += us
+    def advance_ns(self, ns):
+        self._ns += ns
 
 mock_time = MockTime()
-time.ticks_us = mock_time.ticks_us
-time.ticks_diff = mock_time.ticks_diff
+time.monotonic_ns = mock_time.monotonic_ns
 
 from event_bus import EventBus
 from midi_message import MidiMessage, CLOCK, START, STOP, CONTINUE
@@ -28,9 +24,8 @@ from midi_clock_tracker import MidiClockTracker
 
 
 def make_tracker():
-    mock_time._us = 0
-    time.ticks_us = mock_time.ticks_us
-    time.ticks_diff = mock_time.ticks_diff
+    mock_time._ns = 0
+    time.monotonic_ns = mock_time.monotonic_ns
     bus = EventBus()
     tracker = MidiClockTracker(bus)
     return bus, tracker
@@ -45,9 +40,9 @@ def test_beat_every_24_ticks():
     beats = []
     bus.on("beat", lambda: beats.append(True))
 
-    tick_us = 20833
+    tick_ns = 20_833_000
     for i in range(48):  # 2 beats
-        mock_time.advance_us(tick_us)
+        mock_time.advance_ns(tick_ns)
         tracker.process(clock_msg())
 
     assert len(beats) == 2
@@ -58,9 +53,9 @@ def test_tempo_changed_event():
     tempos = []
     bus.on("tempo_changed", lambda bpm: tempos.append(bpm))
 
-    tick_us = 20833  # ~120 BPM
+    tick_ns = 20_833_000  # ~120 BPM
     for i in range(25):
-        mock_time.advance_us(tick_us)
+        mock_time.advance_ns(tick_ns)
         tracker.process(clock_msg())
 
     assert len(tempos) == 1
@@ -72,14 +67,14 @@ def test_tempo_change_detection():
     tempos = []
     bus.on("tempo_changed", lambda bpm: tempos.append(bpm))
 
-    tick_us_120 = 20833
+    tick_ns_120 = 20_833_000
     for i in range(25):
-        mock_time.advance_us(tick_us_120)
+        mock_time.advance_ns(tick_ns_120)
         tracker.process(clock_msg())
 
-    tick_us_90 = 27778
-    for i in range(25):
-        mock_time.advance_us(tick_us_90)
+    tick_ns_90 = 27_778_000
+    for i in range(50):  # extra ticks for smoothing buffer to settle
+        mock_time.advance_ns(tick_ns_90)
         tracker.process(clock_msg())
 
     assert len(tempos) >= 2
@@ -118,15 +113,15 @@ def test_start_resets_tick_count():
     beats = []
     bus.on("beat", lambda: beats.append(True))
 
-    tick_us = 20833
+    tick_ns = 20_833_000
     for i in range(12):
-        mock_time.advance_us(tick_us)
+        mock_time.advance_ns(tick_ns)
         tracker.process(clock_msg())
 
     tracker.process(MidiMessage(START))
 
     for i in range(24):
-        mock_time.advance_us(tick_us)
+        mock_time.advance_ns(tick_ns)
         tracker.process(clock_msg())
 
     assert len(beats) == 1
