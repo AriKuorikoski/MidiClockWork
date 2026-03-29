@@ -37,27 +37,42 @@ Active Sensing (`0xFE`) is a system real-time byte sent every ~300ms by some dev
 
 ---
 
-## 4. Clock jitter from fixed poll delay
+## 4. BPM jitter over USB MIDI at high tempos
 
-**Status:** Present in `code.py`
-**Impact:** Medium — degrades tempo accuracy
+**Status:** Present
+**Impact:** Low — ±1 BPM oscillation in some cases
 
-`time.sleep(0.001)` in the main loop adds up to 1ms of latency per iteration. At 120 BPM the CLOCK tick interval is ~20.8ms, so each sleep can add ~5% jitter per tick. This worsens at higher BPM.
+USB MIDI batches clock bytes into USB bulk transfers. At high BPM (>180), the batching can cause small timing variations that show up as ±1 BPM oscillation in the smoothed reading. A 10-reading moving average reduces this but doesn't eliminate it entirely.
 
-**Fix:** Remove the sleep and poll as fast as possible, or switch to interrupt-driven UART reading to decouple timing from the poll loop.
+This does not affect UART input (hardware-accurate timing) and is only visible when using USB MIDI input from a PC.
+
+**Fix:** Increase the smoothing window, or accept ±1 BPM as within tolerance for the Valeton GP-50.
+
+---
+
+## 5. ConsoleWriter slows main loop at high BPM
+
+**Status:** Present (test/debug only)
+**Impact:** Low — affects console debug output, not production
+
+Printing MIDI messages to the USB CDC serial console takes ~5ms per print. At high BPM (>180), this delays the main loop enough to miss some clock bytes, causing inaccurate BPM readings in console output mode.
+
+Does not affect UART output (production path) which writes at 31250 baud (~1ms per message).
+
+**Fix:** Use `"writer": "uart"` (default) for accurate timing. ConsoleWriter is for debugging at moderate tempos only.
 
 ---
 
 ## Resolved
 
-### BLE MIDI iOS pairing (resolved by CircuitPython port)
+### BLE MIDI on Pico W (partially resolved)
 
-MicroPython's BTstack on Pico W did not support the security manager protocol required by iOS CoreMIDI for BLE MIDI connections. The device could be discovered but never completed the MIDI handshake.
+MicroPython's BTstack could not pair with iOS (security manager not exposed). Ported to CircuitPython which has `adafruit_ble_midi` with iOS pairing support, but CircuitPython's `_bleio` module does not yet support the Pico W's CYW43 chip (`_bleio.adapter` is `None`). BLE MIDI works on CircuitPython boards with native BLE (nRF52840).
 
-**Resolution:** Ported to CircuitPython with `adafruit_ble_midi`, which handles iOS pairing automatically.
+**Status:** BLE MIDI on Pico W requires either CircuitPython CYW43 BLE support (open feature request) or a Rust rewrite using Embassy + TrouBLE.
 
 ### USB MIDI module missing (resolved by CircuitPython port)
 
 MicroPython's standard Pico W firmware did not include the `usb.device.midi` module needed for USB MIDI.
 
-**Resolution:** CircuitPython includes the `usb_midi` module built-in.
+**Resolution:** CircuitPython includes the `usb_midi` module built-in. Verified working with REAPER at 120-240 BPM.
